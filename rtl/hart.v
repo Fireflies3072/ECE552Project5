@@ -164,9 +164,9 @@ module hart #(
     wire[31:0] id_imm;
 
     wire[31:0] id_rs1_data, id_rs2_data;
-    wire[2:0] id_alu_opsel;
+    wire[3:0] id_alu_op;
     wire[1:0] id_wb_mux;
-    wire id_reg_wen, id_alu_src1, id_alu_src2, id_alu_sub, id_alu_unsigned, id_alu_arith;
+    wire id_reg_wen, id_alu_src1, id_alu_src2;
     wire id_mem_ren, id_mem_wen, id_branch, id_jump, id_jalr, id_halt;
     wire id_uses_rs1, id_uses_rs2;
 
@@ -188,14 +188,11 @@ module hart #(
         .o_imm(id_imm),
         .o_rs1_data(id_rs1_data),
         .o_rs2_data(id_rs2_data),
-        .o_alu_opsel(id_alu_opsel),
+        .o_alu_op(id_alu_op),
         .o_wb_mux(id_wb_mux),
         .o_reg_wen(id_reg_wen),
         .o_alu_src1(id_alu_src1),
         .o_alu_src2(id_alu_src2),
-        .o_alu_sub(id_alu_sub),
-        .o_alu_unsigned(id_alu_unsigned),
-        .o_alu_arith(id_alu_arith),
         .o_mem_ren(id_mem_ren),
         .o_mem_wen(id_mem_wen),
         .o_branch(id_branch),
@@ -207,36 +204,33 @@ module hart #(
     );
 
     // ID/EX pipeline register
-    reg        id_ex_valid;
-    reg [31:0] id_ex_pc;
-    reg [31:0] id_ex_inst;
-    reg [31:0] id_ex_next_pc_seq;
-    reg [31:0] id_ex_imm;
-    reg [31:0] id_ex_rs1_data;
-    reg [31:0] id_ex_rs2_data;
-    reg [4:0]  id_ex_rs1_addr;
-    reg [4:0]  id_ex_rs2_addr;
-    reg [4:0]  id_ex_rd_addr;
-    reg        id_ex_reg_wen;
-    reg        id_ex_alu_src1;
-    reg        id_ex_alu_src2;
-    reg [2:0]  id_ex_alu_opsel;
-    reg        id_ex_alu_sub;
-    reg        id_ex_alu_unsigned;
-    reg        id_ex_alu_arith;
-    reg [2:0]  id_ex_funct3;
-    reg        id_ex_mem_ren;
-    reg        id_ex_mem_wen;
-    reg [1:0]  id_ex_wb_mux;
-    reg        id_ex_branch;
-    reg        id_ex_jump;
-    reg        id_ex_jalr;
-    reg        id_ex_halt;
+    reg id_ex_valid;
+    reg[31:0] id_ex_inst;
+    reg[31:0] id_ex_pc;
+    reg[31:0] id_ex_next_pc_seq;
+    reg[31:0] id_ex_imm;
+    reg[31:0] id_ex_rs1_data;
+    reg[31:0] id_ex_rs2_data;
+    reg[4:0] id_ex_rs1_addr;
+    reg[4:0] id_ex_rs2_addr;
+    reg[4:0] id_ex_rd_addr;
+    reg id_ex_reg_wen;
+    reg id_ex_alu_src1;
+    reg id_ex_alu_src2;
+    reg[3:0] id_ex_alu_op;
+    reg[2:0]  id_ex_funct3;
+    reg id_ex_mem_ren;
+    reg id_ex_mem_wen;
+    reg[1:0] id_ex_wb_mux;
+    reg id_ex_branch;
+    reg id_ex_jump;
+    reg id_ex_jalr;
+    reg id_ex_halt;
 
     // EX stage
-    wire [31:0] ex_alu_result;
-    wire [31:0] ex_next_pc;
-    wire        ex_control_redirect;
+    wire[31:0] ex_alu_result;
+    wire[31:0] ex_next_pc;
+    wire ex_control_redirect;
 
     ex_stage ex_stage_inst (
         .i_valid(id_ex_valid),
@@ -247,10 +241,7 @@ module hart #(
         .i_rs2_data(id_ex_rs2_data),
         .i_alu_src1(id_ex_alu_src1),
         .i_alu_src2(id_ex_alu_src2),
-        .i_alu_opsel(id_ex_alu_opsel),
-        .i_alu_sub(id_ex_alu_sub),
-        .i_alu_unsigned(id_ex_alu_unsigned),
-        .i_alu_arith(id_ex_alu_arith),
+        .i_alu_op(id_ex_alu_op),
         .i_funct3(id_ex_funct3),
         .i_branch(id_ex_branch),
         .i_jump(id_ex_jump),
@@ -261,28 +252,28 @@ module hart #(
     );
 
     // EX/MEM pipeline register
-    reg        ex_mem_valid;
-    reg [31:0] ex_mem_pc;
-    reg [31:0] ex_mem_inst;
-    reg [31:0] ex_mem_next_pc;
-    reg [4:0]  ex_mem_rs1_addr;
-    reg [4:0]  ex_mem_rs2_addr;
-    reg [31:0] ex_mem_rs1_data;
-    reg [31:0] ex_mem_rs2_data;
-    reg [4:0]  ex_mem_rd_addr;
-    reg        ex_mem_reg_wen;
-    reg [1:0]  ex_mem_wb_mux;
-    reg [31:0] ex_mem_alu_result;
-    reg [31:0] ex_mem_imm;
-    reg        ex_mem_mem_ren;
-    reg        ex_mem_mem_wen;
-    reg [2:0]  ex_mem_funct3;
-    reg        ex_mem_halt;
+    reg ex_mem_valid;
+    reg[31:0] ex_mem_pc;
+    reg[31:0] ex_mem_inst;
+    reg[31:0] ex_mem_next_pc;
+    reg[4:0] ex_mem_rs1_addr;
+    reg[4:0] ex_mem_rs2_addr;
+    reg[31:0] ex_mem_rs1_data;
+    reg[31:0] ex_mem_rs2_data;
+    reg[4:0] ex_mem_rd_addr;
+    reg ex_mem_reg_wen;
+    reg[1:0] ex_mem_wb_mux;
+    reg[31:0] ex_mem_alu_result;
+    reg[31:0] ex_mem_imm;
+    reg ex_mem_mem_ren;
+    reg ex_mem_mem_wen;
+    reg[2:0] ex_mem_funct3;
+    reg ex_mem_halt;
 
     // MEM stage
-    wire [31:0] mem_load_data;
-    wire [3:0]  mem_dmem_mask;
-    wire [31:0] mem_dmem_wdata;
+    wire[31:0] mem_load_data;
+    wire[3:0]  mem_dmem_mask;
+    wire[31:0] mem_dmem_wdata;
 
     mem_stage mem_stage_inst (
         .i_valid(ex_mem_valid),
@@ -303,27 +294,29 @@ module hart #(
     );
 
     // MEM/WB pipeline register
-    reg        mem_wb_valid;
-    reg [31:0] mem_wb_pc;
-    reg [31:0] mem_wb_inst;
-    reg [31:0] mem_wb_next_pc;
-    reg [4:0]  mem_wb_rs1_addr;
-    reg [4:0]  mem_wb_rs2_addr;
-    reg [31:0] mem_wb_rs1_data;
-    reg [31:0] mem_wb_rs2_data;
-    reg [4:0]  mem_wb_rd_addr;
-    reg        mem_wb_reg_wen;
-    reg [1:0]  mem_wb_wb_mux;
-    reg [31:0] mem_wb_alu_result;
-    reg [31:0] mem_wb_load_data;
-    reg [31:0] mem_wb_imm;
-    reg        mem_wb_halt;
-    reg [31:0] mem_wb_dmem_addr;
-    reg        mem_wb_dmem_ren;
-    reg        mem_wb_dmem_wen;
-    reg [3:0]  mem_wb_dmem_mask;
-    reg [31:0] mem_wb_dmem_rdata;
-    reg [31:0] mem_wb_dmem_wdata;
+    reg mem_wb_valid;
+    reg[31:0] mem_wb_pc;
+    reg[31:0] mem_wb_inst;
+    reg[31:0] mem_wb_next_pc;
+
+    reg[4:0] mem_wb_rs1_addr;
+    reg[4:0] mem_wb_rs2_addr;
+    reg[31:0] mem_wb_rs1_data;
+    reg[31:0] mem_wb_rs2_data;
+    reg[4:0] mem_wb_rd_addr;
+    reg mem_wb_reg_wen;
+
+    reg[1:0] mem_wb_wb_mux;
+    reg[31:0] mem_wb_alu_result;
+    reg[31:0] mem_wb_load_data;
+    reg[31:0] mem_wb_imm;
+    reg mem_wb_halt;
+    reg[31:0] mem_wb_dmem_addr;
+    reg mem_wb_dmem_ren;
+    reg mem_wb_dmem_wen;
+    reg[3:0] mem_wb_dmem_mask;
+    reg[31:0] mem_wb_dmem_rdata;
+    reg[31:0] mem_wb_dmem_wdata;
 
     // WB stage
     wb_stage wb_stage_inst (
@@ -342,19 +335,19 @@ module hart #(
 
     // Hazard detection (stall in ID)
     wire hazard_from_id_ex_rs1 = id_ex_valid && id_ex_reg_wen && (id_ex_rd_addr != 5'd0) &&
-                                 id_uses_rs1 && (id_ex_rd_addr == id_rs1_addr);
+                                    id_uses_rs1 && (id_ex_rd_addr == id_rs1_addr);
     wire hazard_from_id_ex_rs2 = id_ex_valid && id_ex_reg_wen && (id_ex_rd_addr != 5'd0) &&
-                                 id_uses_rs2 && (id_ex_rd_addr == id_rs2_addr);
+                                    id_uses_rs2 && (id_ex_rd_addr == id_rs2_addr);
     wire hazard_from_ex_mem_rs1 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
-                                  id_uses_rs1 && (ex_mem_rd_addr == id_rs1_addr);
+                                    id_uses_rs1 && (ex_mem_rd_addr == id_rs1_addr);
     wire hazard_from_ex_mem_rs2 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
-                                  id_uses_rs2 && (ex_mem_rd_addr == id_rs2_addr);
+                                    id_uses_rs2 && (ex_mem_rd_addr == id_rs2_addr);
 
     wire id_stall = if_id_valid &&
                     (hazard_from_id_ex_rs1 || hazard_from_id_ex_rs2 ||
-                     hazard_from_ex_mem_rs1 || hazard_from_ex_mem_rs2);
+                    hazard_from_ex_mem_rs1 || hazard_from_ex_mem_rs2);
 
-    // Sequential state updates
+    // Intermediate state updates
     always @(posedge i_clk) begin
         if (i_rst) begin
             // Reset everything
@@ -371,7 +364,7 @@ module hart #(
                 if_pc <= if_pc_plus_4;
             end
 
-            // IF/ID update: hold on stall, flush on redirect
+            // IF/ID update
             if (ex_control_redirect) begin
                 if_id_valid <= 1'b0;
                 if_id_pc <= 32'd0;
@@ -382,7 +375,7 @@ module hart #(
                 if_id_inst <= if_inst;
             end
 
-            // ID/EX update: bubble on stall and on redirect
+            // ID/EX update
             if (ex_control_redirect || id_stall || !if_id_valid) begin
                 id_ex_valid <= 1'b0;
                 id_ex_pc <= 32'd0;
@@ -397,10 +390,7 @@ module hart #(
                 id_ex_reg_wen <= 1'b0;
                 id_ex_alu_src1 <= 1'b0;
                 id_ex_alu_src2 <= 1'b0;
-                id_ex_alu_opsel <= 3'd0;
-                id_ex_alu_sub <= 1'b0;
-                id_ex_alu_unsigned <= 1'b0;
-                id_ex_alu_arith <= 1'b0;
+                id_ex_alu_op <= 4'd0;
                 id_ex_funct3 <= 3'd0;
                 id_ex_mem_ren <= 1'b0;
                 id_ex_mem_wen <= 1'b0;
@@ -423,10 +413,7 @@ module hart #(
                 id_ex_reg_wen <= id_reg_wen;
                 id_ex_alu_src1 <= id_alu_src1;
                 id_ex_alu_src2 <= id_alu_src2;
-                id_ex_alu_opsel <= id_alu_opsel;
-                id_ex_alu_sub <= id_alu_sub;
-                id_ex_alu_unsigned <= id_alu_unsigned;
-                id_ex_alu_arith <= id_alu_arith;
+                id_ex_alu_op <= id_alu_op;
                 id_ex_funct3 <= id_funct3;
                 id_ex_mem_ren <= id_mem_ren;
                 id_ex_mem_wen <= id_mem_wen;
@@ -481,9 +468,7 @@ module hart #(
         end
     end
 
-    // ----------------------------
-    // Retire interface (WB stage)
-    // ----------------------------
+    // Assign retire values
     assign o_retire_valid = mem_wb_valid;
     assign o_retire_inst = mem_wb_inst;
     assign o_retire_trap = 1'b0;
