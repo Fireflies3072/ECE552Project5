@@ -118,21 +118,19 @@ module hart #(
     // writeback stage by this instruction. If rd is 5'd0, this field is
     // ignored and can be treated as a don't care.
     output wire [31:0] o_retire_rd_wdata,
+    output wire [31:0] o_retire_dmem_addr,
+    output wire [ 3:0] o_retire_dmem_mask,
+    output wire        o_retire_dmem_ren,
+    output wire        o_retire_dmem_wen,
+    output wire [31:0] o_retire_dmem_rdata,
+    output wire [31:0] o_retire_dmem_wdata,
     // The current program counter of the instruction being retired - i.e.
     // the instruction memory address that the instruction was fetched from.
     output wire [31:0] o_retire_pc,
     // the next program counter after the instruction is retired. For most
     // instructions, this is `o_retire_pc + 4`, but must be the branch or jump
     // target for *taken* branches and jumps.
-    output wire [31:0] o_retire_next_pc,
-
-    // Data memory retired output
-    output wire [31:0] o_retire_dmem_addr,
-    output wire o_retire_dmem_ren,
-    output wire o_retire_dmem_wen,
-    output wire [3:0] o_retire_dmem_mask,
-    output wire [31:0] o_retire_dmem_wdata,
-    output wire [31:0] o_retire_dmem_rdata
+    output wire [31:0] o_retire_next_pc
 
 `ifdef RISCV_FORMAL
     ,`RVFI_OUTPUTS,
@@ -231,14 +229,16 @@ module hart #(
     wire[31:0] ex_alu_result;
     wire[31:0] ex_next_pc;
     wire ex_control_redirect;
+    wire[31:0] ex_rs1_data_fwd;
+    wire[31:0] ex_rs2_data_fwd;
 
     ex_stage ex_stage_inst (
         .i_valid(id_ex_valid),
         .i_pc(id_ex_pc),
         .i_next_pc_seq(id_ex_next_pc_seq),
         .i_imm(id_ex_imm),
-        .i_rs1_data(id_ex_rs1_data),
-        .i_rs2_data(id_ex_rs2_data),
+        .i_rs1_data(ex_rs1_data_fwd),
+        .i_rs2_data(ex_rs2_data_fwd),
         .i_alu_src1(id_ex_alu_src1),
         .i_alu_src2(id_ex_alu_src2),
         .i_alu_op(id_ex_alu_op),
@@ -260,6 +260,7 @@ module hart #(
     reg[4:0] ex_mem_rs2_addr;
     reg[31:0] ex_mem_rs1_data;
     reg[31:0] ex_mem_rs2_data;
+    reg[31:0] ex_mem_store_data;
     reg[4:0] ex_mem_rd_addr;
     reg ex_mem_reg_wen;
     reg[1:0] ex_mem_wb_mux;
@@ -278,7 +279,7 @@ module hart #(
     mem_stage mem_stage_inst (
         .i_valid(ex_mem_valid),
         .i_alu_result(ex_mem_alu_result),
-        .i_rs2_data(ex_mem_rs2_data),
+        .i_rs2_data(ex_mem_store_data),
         .i_mem_ren(ex_mem_mem_ren),
         .i_mem_wen(ex_mem_mem_wen),
         .i_funct3(ex_mem_funct3),
@@ -333,19 +334,39 @@ module hart #(
         .o_wb_reg_wen(wb_reg_wen)
     );
 
-    // Hazard detection (stall in ID)
-    wire hazard_from_id_ex_rs1 = id_ex_valid && id_ex_reg_wen && (id_ex_rd_addr != 5'd0) &&
-                                    id_uses_rs1 && (id_ex_rd_addr == id_rs1_addr);
-    wire hazard_from_id_ex_rs2 = id_ex_valid && id_ex_reg_wen && (id_ex_rd_addr != 5'd0) &&
-                                    id_uses_rs2 && (id_ex_rd_addr == id_rs2_addr);
-    wire hazard_from_ex_mem_rs1 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
-                                    id_uses_rs1 && (ex_mem_rd_addr == id_rs1_addr);
-    wire hazard_from_ex_mem_rs2 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
-                                    id_uses_rs2 && (ex_mem_rd_addr == id_rs2_addr);
+    // Execution result
+    wire[31:0] ex_mem_forward_data = (ex_mem_wb_mux == 2'd0) ? ex_mem_alu_result :
+                                     (ex_mem_wb_mux == 2'd2) ? (ex_mem_pc + 32'd4) :
+                                     (ex_mem_wb_mux == 2'd3) ? ex_mem_imm :
+                                     32'd0;
 
-    wire id_stall = if_id_valid &&
-                    (hazard_from_id_ex_rs1 || hazard_from_id_ex_rs2 ||
-                    hazard_from_ex_mem_rs1 || hazard_from_ex_mem_rs2);
+    // EX-EX forwarding condition
+    wire ex_ex_forward_rs1 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
+                             (ex_mem_rd_addr == id_ex_rs1_addr);
+    wire ex_ex_forward_rs2 = ex_mem_valid && ex_mem_reg_wen && (ex_mem_rd_addr != 5'd0) &&
+                             (ex_mem_rd_addr == id_ex_rs2_addr);
+
+    // MEM-EX forwarding condition
+    wire mem_ex_forward_rs1 = mem_wb_valid && mem_wb_reg_wen && (mem_wb_rd_addr != 5'd0) &&
+                              (mem_wb_rd_addr == id_ex_rs1_addr);
+    wire mem_ex_forward_rs2 = mem_wb_valid && mem_wb_reg_wen && (mem_wb_rd_addr != 5'd0) &&
+                              (mem_wb_rd_addr == id_ex_rs2_addr);
+
+    // Forwarding data to EX stage
+    assign ex_rs1_data_fwd = ex_ex_forward_rs1 ? ex_mem_forward_data :
+                             mem_ex_forward_rs1 ? wb_rd_data :
+                             id_ex_rs1_data;
+    assign ex_rs2_data_fwd = ex_ex_forward_rs2 ? ex_mem_forward_data :
+                             mem_ex_forward_rs2 ? wb_rd_data :
+                             id_ex_rs2_data;
+
+    // Stall when load-to-use hazards (load result is not ready for next EX cycle)
+    wire load_use_hazard_rs1 = id_ex_valid && id_ex_mem_ren && (id_ex_rd_addr != 5'd0) &&
+                               id_uses_rs1 && (id_ex_rd_addr == id_rs1_addr);
+    wire load_use_hazard_rs2 = id_ex_valid && id_ex_mem_ren && (id_ex_rd_addr != 5'd0) &&
+                               id_uses_rs2 && (id_ex_rd_addr == id_rs2_addr);
+
+    wire id_stall = if_id_valid && (load_use_hazard_rs1 || load_use_hazard_rs2);
 
     // Intermediate state updates
     always @(posedge i_clk) begin
@@ -433,6 +454,7 @@ module hart #(
             ex_mem_rs2_addr <= id_ex_rs2_addr;
             ex_mem_rs1_data <= id_ex_rs1_data;
             ex_mem_rs2_data <= id_ex_rs2_data;
+            ex_mem_store_data <= ex_rs2_data_fwd;
             ex_mem_rd_addr <= id_ex_rd_addr;
             ex_mem_reg_wen <= id_ex_reg_wen;
             ex_mem_wb_mux <= id_ex_wb_mux;
