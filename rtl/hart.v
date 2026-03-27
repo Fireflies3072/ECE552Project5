@@ -452,8 +452,8 @@ module hart #(
             ex_mem_next_pc <= ex_next_pc;
             ex_mem_rs1_addr <= id_ex_rs1_addr;
             ex_mem_rs2_addr <= id_ex_rs2_addr;
-            ex_mem_rs1_data <= id_ex_rs1_data;
-            ex_mem_rs2_data <= id_ex_rs2_data;
+            ex_mem_rs1_data <= ex_rs1_data_fwd;
+            ex_mem_rs2_data <= ex_rs2_data_fwd;
             ex_mem_store_data <= ex_rs2_data_fwd;
             ex_mem_rd_addr <= id_ex_rd_addr;
             ex_mem_reg_wen <= id_ex_reg_wen;
